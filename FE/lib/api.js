@@ -67,7 +67,6 @@ let meta = null
 export const getMeta = () => (meta ??= request("/meta").catch((e) => ((meta = null), Promise.reject(e))))
 
 // ---------------------------------------------------------------- agent chat (employee)
-export const sendMessage = (message, threadId) => request("/agent/chat", { method: "POST", body: { message, thread_id: threadId } })
 
 /** Streams the agent's steps: calls onEvent({ type, ... }) for each server-sent event as it arrives. */
 export async function streamMessage(message, threadId, onEvent) {

@@ -1,3 +1,5 @@
+"""LLM endpoint for IT support: send a prompt straight to the Groq model to check it is working."""
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -8,10 +10,12 @@ from app.core.llm_client import llm
 router = APIRouter(prefix="/llm", tags=["llm"], dependencies=[Depends(require_roles("it_support"))])
 
 
+# Request body: the prompt to send
 class AskRequest(BaseModel):
     prompt: str
 
 
+# Ask the LLM a question and return its answer
 @router.post("/ask")
 async def ask(body: AskRequest):
 

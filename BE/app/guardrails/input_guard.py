@@ -1,9 +1,5 @@
-"""input_guard node: runs on every employee message before the agent sees it.
-
-- Password / MFA code shared  -> message replaced, agent not called (blocked)
-- Prompt injection            -> agent not called (blocked)
-- Email / card number         -> redacted, agent continues
-The employee's message is replaced in place (same id), so nothing sensitive is stored in the chat memory.
+"""input_guard node: checks every employee message before the agent sees it.
+Blocks passwords and prompt injection, redacts PII; the message is replaced in place so nothing sensitive is stored.
 """
 
 from langchain.messages import AIMessage, HumanMessage
@@ -12,10 +8,12 @@ from app.agent.state import AgentState
 from app.guardrails import rules
 
 
+# Block, redact or pass the latest employee message
 async def input_guard(state: AgentState) -> dict:
     message = state["messages"][-1]
     text = message.content
 
+    # Password or code shared: remove it and stop
     if rules.SECRET_SHARED.search(text):
         return {
             "messages": [HumanMessage(rules.SECRET_REMOVED, id=message.id), AIMessage(rules.SECRET_REPLY)],
@@ -23,6 +21,7 @@ async def input_guard(state: AgentState) -> dict:
             "guardrails": ["input: password or code removed, request blocked"],
         }
 
+    # Prompt injection: stop
     if rules.PROMPT_INJECTION.search(text):
         return {
             "messages": [AIMessage(rules.INJECTION_REPLY)],
@@ -30,6 +29,7 @@ async def input_guard(state: AgentState) -> dict:
             "guardrails": ["input: prompt injection blocked"],
         }
 
+    # Email or card number: redact and continue
     redacted, found = rules.redact_pii(text)
     if found:
         return {

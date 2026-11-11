@@ -1,10 +1,4 @@
-"""Builds the agent workflow.
-
-START -> input_guard -> classify_issue -> search_knowledge (RAG) -> resolve_issue <-> tools -> output_guard -> END
-              |          (first message of a chat only)                ^
-              |                                follow-up messages start here
-              +--> END when the input guardrail blocks the message
-"""
+"""Agent workflow: input_guard -> classify_issue -> search_knowledge (RAG) -> resolve_issue <-> tools -> output_guard."""
 
 from groq import BadRequestError
 from langgraph.checkpoint.mongodb import MongoDBSaver
@@ -23,19 +17,22 @@ from app.guardrails.output_guard import output_guard
 from app.tools import TOOLS
 
 
+# Blocked -> END, follow-up -> resolve_issue, first message -> classify_issue
 def after_input_guard(state: AgentState) -> str:
+    """Choose the next node after the input guardrail."""
     if state["blocked"]:
         return END
-    # Classify and search the knowledge base once per chat; follow-up messages go straight to resolve_issue
     return "resolve_issue" if state.get("category") else "classify_issue"
 
 
+# Graph over the shared AgentState
 builder = StateGraph(AgentState)
 
+# Nodes
 builder.add_node("input_guard", input_guard)
 builder.add_node("classify_issue", classify_issue)
 builder.add_node("search_knowledge", search_knowledge)
-# Groq returns 400 when the model writes a broken tool call; asking again usually fixes it
+# Retry when Groq rejects a malformed tool call
 builder.add_node(
     "resolve_issue",
     resolve_issue,
@@ -44,16 +41,17 @@ builder.add_node(
 builder.add_node("tools", ToolNode(TOOLS))
 builder.add_node("output_guard", output_guard)
 
+# Edges
 builder.add_edge(START, "input_guard")
 builder.add_conditional_edges("input_guard", after_input_guard, ["classify_issue", "resolve_issue", END])
 builder.add_edge("classify_issue", "search_knowledge")
 builder.add_edge("search_knowledge", "resolve_issue")
-# No tool call means the agent wrote its final reply: check it before the employee sees it
+# Tool call -> tools, final reply -> output_guard
 builder.add_conditional_edges("resolve_issue", tools_condition, {"tools": "tools", END: "output_guard"})
 builder.add_edge("tools", "resolve_issue")
 builder.add_edge("output_guard", END)
 
-# Chat memory and paused approvals are stored in MongoDB, so they survive a server restart
+# Chat memory and paused approvals saved in MongoDB
 checkpointer = MongoDBSaver(sync_client, db_name=settings.MONGODB_DB)
 
 graph = builder.compile(checkpointer=checkpointer)

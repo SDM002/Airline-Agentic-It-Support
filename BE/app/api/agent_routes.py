@@ -1,3 +1,7 @@
+"""Agent endpoints: the employee chats with the agent (normal or streamed) and reads their chat history.
+The employee always comes from the login token, never from the request body.
+"""
+
 import json
 from uuid import uuid4
 
@@ -14,17 +18,20 @@ from app.services import conversation_service
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
+# Shown when the Groq usage limit is reached
 LLM_BUSY = "The AI assistant is busy (LLM usage limit reached). Please try again later."
 
-# Save chat memory only when a run ends, after the input guardrail has removed any password from the message
+# Save chat memory only when a run ends, after the input guardrail has removed any password
 SAVE_AT_END = "exit"
 
 
+# Request body: the employee's message, and the chat to continue (empty for a new chat)
 class ChatRequest(BaseModel):
     message: str
     thread_id: str | None = None
 
 
+# Load a chat and check it belongs to the logged-in employee
 async def own_conversation(thread_id: str, user: dict) -> dict:
     conversation = await conversation_service.get(thread_id)
     if conversation is None or conversation["employee_id"] != user["id"]:
@@ -32,14 +39,15 @@ async def own_conversation(thread_id: str, user: dict) -> dict:
     return conversation
 
 
+# Dependency: the employee's existing chat, or a new thread_id
 async def chat_thread(body: ChatRequest, user: dict = Depends(current_user)) -> str:
-    """The chat to continue (must belong to this employee), or a new one."""
     if body.thread_id:
         await own_conversation(body.thread_id, user)
         return body.thread_id
     return str(uuid4())
 
 
+# Send a message and get the agent's full reply in one response
 @router.post("/chat")
 async def chat(body: ChatRequest, thread_id: str = Depends(chat_thread), user: dict = Depends(current_user)):
 
@@ -63,6 +71,7 @@ async def chat(body: ChatRequest, thread_id: str = Depends(chat_thread), user: d
     }
 
 
+# Tool results arrive as JSON text: parse them for the chat screen
 def tool_output(content):
     try:
         return json.loads(content)
@@ -70,8 +79,8 @@ def tool_output(content):
         return content
 
 
+# Turn one finished graph node into the events the chat screen shows
 def step_events(node: str, update) -> list[dict]:
-    """One graph node finished -> the events the chat screen shows for it."""
     if node == "input_guard":
         events = [{"type": "guardrail", "rule": rule} for rule in update["guardrails"]]
         if update["blocked"]:
@@ -95,9 +104,9 @@ def step_events(node: str, update) -> list[dict]:
     return []
 
 
+# Send a message and stream each agent step as a server-sent event
 @router.post("/chat/stream", response_class=EventSourceResponse)
 async def chat_stream(body: ChatRequest, thread_id: str = Depends(chat_thread), user: dict = Depends(current_user)):
-    """Same as /chat, but sends each agent step as it happens (server-sent events)."""
 
     await conversation_service.save(thread_id, user["id"], rules.safe_to_store(body.message))
     yield {"type": "start", "thread_id": thread_id}
@@ -115,11 +124,13 @@ async def chat_stream(body: ChatRequest, thread_id: str = Depends(chat_thread), 
     yield {"type": "done", "thread_id": thread_id}
 
 
+# The logged-in employee's chats (history list)
 @router.get("/conversations")
 async def list_conversations(user: dict = Depends(current_user)):
     return await conversation_service.list_for(user["id"])
 
 
+# One chat's messages and any pending approval, read from the checkpointer
 @router.get("/conversations/{thread_id}")
 async def get_conversation(thread_id: str, user: dict = Depends(current_user)):
 

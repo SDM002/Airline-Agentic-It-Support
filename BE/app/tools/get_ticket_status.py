@@ -1,8 +1,11 @@
+"""Tool: status of one of the logged-in employee's own tickets."""
+
 from langchain.tools import ToolRuntime, tool
 
 from app.services import ticket_service
 
 
+# Ticket status and latest comment, only for the employee's own tickets
 @tool
 async def get_ticket_status(ticket_id: str, runtime: ToolRuntime) -> dict:
     """Get a ticket's status, assignee and latest comment."""
