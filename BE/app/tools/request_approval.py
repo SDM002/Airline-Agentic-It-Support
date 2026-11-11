@@ -1,9 +1,12 @@
+"""Tool: request human approval for access; pauses the agent until a manager or IAM decides."""
+
 from langchain.tools import ToolRuntime, tool
 from langgraph.types import interrupt
 
 from app.services import approval_service, ticket_service
 
 
+# Store the approval, then pause the graph until the decision arrives
 @tool
 async def request_approval(ticket_id: str, requested_access: str, reason: str, runtime: ToolRuntime) -> dict:
     """Ask a manager or IT support to approve a sensitive action (e.g. granting system access).
@@ -15,7 +18,7 @@ async def request_approval(ticket_id: str, requested_access: str, reason: str, r
         ticket_id, requested_access, reason, runtime.config["configurable"]["thread_id"]
     )
 
-    # Pauses the graph here. Resumes with the human decision from POST /approvals/{id}/decision
+    # Pause here; resumed by POST /approvals/{id}/decision
     decision = interrupt({
         "approval_id": approval["id"],
         "ticket_id": ticket_id,

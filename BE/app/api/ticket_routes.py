@@ -1,3 +1,7 @@
+"""Ticket endpoints: employees see their own tickets; IT support sees all tickets and updates them.
+Ticket detail also shows what the agent used: similar tickets, matching SOPs (RAG) and the agent's trace.
+"""
+
 from fastapi import APIRouter, Depends, HTTPException
 from langchain.messages import AIMessage
 from pydantic import BaseModel
@@ -9,9 +13,11 @@ from app.services import knowledge_service, ticket_service
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
+# Only IT support may list all tickets or change them
 it_only = require_roles("it_support")
 
 
+# Request body: the fields an engineer may change, plus an optional comment
 class TicketUpdate(BaseModel):
     status: Status | None = None
     priority: Priority | None = None
@@ -20,16 +26,19 @@ class TicketUpdate(BaseModel):
     comment: str | None = None
 
 
+# All tickets, optionally filtered by status and team
 @router.get("")
 async def list_tickets(status: Status | None = None, team: Team | None = None, user: dict = Depends(it_only)):
     return await ticket_service.list_tickets({"status": status, "team": team})
 
 
+# The logged-in employee's own tickets
 @router.get("/mine")
 async def my_tickets(user: dict = Depends(current_user)):
     return await ticket_service.list_tickets({"requester_id": user["id"]})
 
 
+# One ticket with comments, audit, similar tickets, SOPs and the agent trace (owner or IT support only)
 @router.get("/{ticket_id}")
 async def get_ticket(ticket_id: str, user: dict = Depends(current_user)):
 
@@ -57,6 +66,7 @@ async def get_ticket(ticket_id: str, user: dict = Depends(current_user)):
     return ticket
 
 
+# Change a ticket's status, priority, team or assignee; logged under the engineer's name
 @router.patch("/{ticket_id}")
 async def update_ticket(ticket_id: str, body: TicketUpdate, user: dict = Depends(it_only)):
     changes = body.model_dump(exclude={"comment"})

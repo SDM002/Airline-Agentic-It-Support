@@ -1,3 +1,5 @@
+"""Tool: create a ticket for the employee in this chat (requester and chat ID come from the state, not the LLM)."""
+
 from langchain.messages import HumanMessage
 from langchain.tools import ToolRuntime, tool
 
@@ -5,6 +7,7 @@ from app.core.domain import Category, Priority, Team
 from app.services import employee_service, ticket_service
 
 
+# Create the ticket from the chat's messages and classified airport
 @tool
 async def create_ticket(summary: str, category: Category, priority: Priority, team: Team, runtime: ToolRuntime) -> dict:
     """Create a support ticket for the employee in this chat. Returns the new ticket ID."""

@@ -1,3 +1,5 @@
+"""Employee directory endpoints, for managers and IT support only (password hashes are never returned)."""
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import require_roles
@@ -6,11 +8,13 @@ from app.services import employee_service
 router = APIRouter(prefix="/employees", tags=["employees"], dependencies=[Depends(require_roles("manager", "it_support"))])
 
 
+# All employees
 @router.get("")
 async def list_employees():
     return await employee_service.list_employees()
 
 
+# One employee by ID
 @router.get("/{employee_id}")
 async def get_employee(employee_id: str):
     employee = await employee_service.get_employee(employee_id)

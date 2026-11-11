@@ -29,6 +29,7 @@ class Settings(BaseSettings):
 
     # Agent
     AGENT_RETRY_ATTEMPTS: int
+    CHAT_TITLE_MAX_CHARS: int
 
     # Pinecone (vector DB, hosted embedding + rerank models)
     PINECONE_API_KEY: SecretStr

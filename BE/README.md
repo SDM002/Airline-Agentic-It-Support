@@ -8,7 +8,7 @@ For the problem statement and the overall architecture, see the [root README](..
 ## Contents
 
 1. [Setup and run](#1-setup-and-run)
-2. [Folder layout](#2-folder-layout)
+2. [Architecture: files and what they do](#2-architecture-files-and-what-they-do)
 3. [Configuration (.env)](#3-configuration-env)
 4. [The agent graph](#4-the-agent-graph)
 5. [System prompts](#5-system-prompts)
@@ -40,34 +40,87 @@ uvicorn main:app --reload --port 8000       # API docs: <backend URL>/docs
 
 Check that it is running: `GET /health` returns `{"status": "ok", "mongodb": "connected"}`.
 
-## 2. Folder layout
+## 2. Architecture: files and what they do
 
 ```
-main.py                    FastAPI app: CORS, routers, "LLM busy" error handler, /health
-requirements.txt           dependencies, grouped by phase
-app/
-  config/settings.py       reads every value from .env (no defaults in code)
-  core/
-    domain.py              business vocabulary: categories, priorities, teams, statuses, levels
-    llm_client.py          the Groq chat model
-  db/
-    mongo.py               MongoDB client, collections, helpers (now, next_id, out, ping)
-    vector_store.py        Pinecone index, embeddings, reranker
-  agent/
-    state.py               AgentState: what every graph node reads and writes
-    graph.py               the LangGraph workflow + MongoDB checkpointer
-    nodes/                 classify_issue.py, search_knowledge.py, resolve_issue.py
-  prompts/                 classify_issue.txt, resolve_issue.txt (system prompts)
-  tools/                   one file per LLM tool; __init__.py lists them in TOOLS
-  guardrails/              rules.py, input_guard.py, output_guard.py
-  services/                business logic shared by the API and the tools
-  api/                     HTTP endpoints, one file per area; deps.py = login and role checks
-data/kb/                   the 2 knowledge base documents (RAG source)
-scripts/ingest_kb.py       chunks data/kb and stores it in Pinecone
+BE/
+├── main.py                          # FastAPI app: CORS, registers all routers, "LLM busy" (503) handler, GET /health
+├── requirements.txt                 # Python dependencies, grouped by build phase
+├── .env.example                     # every config key with an example value (copy to .env)
+├── .env                             # real config and secrets (gitignored, never commit)
+├── .python-version                  # Python version used by the project
+│
+├── app/
+│   ├── config/
+│   │   └── settings.py              # reads every value from .env (no defaults in code); secrets as SecretStr
+│   │
+│   ├── core/
+│   │   ├── domain.py                # business vocabulary as Literal types: categories, priorities, teams, statuses, levels
+│   │   └── llm_client.py            # the Groq chat model (GROQ_* settings), shared by every LLM step
+│   │
+│   ├── db/
+│   │   ├── mongo.py                 # MongoDB clients (async + sync), collections, helpers: now, next_id, out, ping
+│   │   └── vector_store.py          # Pinecone index (created if missing), hosted embeddings, vector store, reranker
+│   │
+│   ├── agent/                       # the LangGraph agent
+│   │   ├── state.py                 # AgentState: the shared data of one chat that every node reads and updates
+│   │   ├── graph.py                 # nodes + edges of the workflow, MongoDB checkpointer, compiled `graph`
+│   │   └── nodes/
+│   │       ├── classify_issue.py    # LLM (structured output): category, priority, team, airport, reason
+│   │       ├── search_knowledge.py  # RAG: best SOP / policy sections from Pinecone, before any MongoDB tool
+│   │       └── resolve_issue.py     # LLM with tools: calls one tool or writes the final reply
+│   │
+│   ├── prompts/                     # system prompts (plain text, filled with str.format)
+│   │   ├── classify_issue.txt       # triage rules: access request check, category → team, P1–P4, airport
+│   │   └── resolve_issue.txt        # the agent's playbook: self-service, incident, escalation, access, status
+│   │
+│   ├── tools/                       # one file per LLM tool; the docstring is what the LLM reads
+│   │   ├── __init__.py              # TOOLS: the list bound to the LLM in resolve_issue
+│   │   ├── search_knowledge_base.py # search Pinecone again (e.g. topic changed)
+│   │   ├── get_employee_profile.py  # employee's department, location, manager
+│   │   ├── find_similar_tickets.py  # similar tickets at an airport → incident detection
+│   │   ├── create_ticket.py         # new ticket; requester and chat ID come from the state, not the LLM
+│   │   ├── assign_ticket.py         # route to a team at L1 / L2
+│   │   ├── update_ticket.py         # change status + comment (resolved, or another incident report)
+│   │   ├── get_ticket_status.py     # status of the employee's own ticket
+│   │   └── request_approval.py      # store an approval and pause the graph (interrupt) until a human decides
+│   │
+│   ├── guardrails/                  # deterministic checks (no LLM), run as graph nodes
+│   │   ├── rules.py                 # regex rules, replies, PII redaction (LangChain detectors)
+│   │   ├── input_guard.py           # before the agent: block passwords / prompt injection, redact PII
+│   │   └── output_guard.py          # before the employee: replace secret requests, remove [IT only], redact PII
+│   │
+│   ├── services/                    # business logic shared by the API routes and the tools
+│   │   ├── ticket_service.py        # create, get, detail, list, update (+ audit log, comments), find similar
+│   │   ├── approval_service.py      # request, who may decide, list (managers: own team), decide
+│   │   ├── employee_service.py      # employee records without password hashes
+│   │   ├── knowledge_service.py     # RAG retrieval: vector search (RAG_TOP_K) → rerank (RAG_TOP_N)
+│   │   ├── auth_service.py          # Argon2 password check, create / read JWTs
+│   │   └── conversation_service.py  # chat list per employee (messages live in the checkpointer)
+│   │
+│   └── api/                         # HTTP endpoints, one file per area
+│       ├── deps.py                  # current_user (from the JWT) and require_roles(...) dependencies
+│       ├── auth_routes.py           # POST /auth/login, GET /auth/me
+│       ├── agent_routes.py          # POST /agent/chat, /agent/chat/stream (SSE), chat history
+│       ├── ticket_routes.py         # GET /tickets, /tickets/mine, /tickets/{id} (with RAG + trace), PATCH
+│       ├── approval_routes.py       # GET /approvals, POST /approvals/{id}/decision (resumes the agent)
+│       ├── employee_routes.py       # GET /employees, /employees/{id}
+│       ├── knowledge_routes.py      # GET /knowledge/search (test RAG)
+│       ├── llm_routes.py            # POST /llm/ask (test the LLM)
+│       └── meta_routes.py           # GET /meta: business values for the frontend
+│
+├── data/kb/                         # knowledge base documents (RAG source, synthetic demo content)
+│   ├── airport_systems_troubleshooting_guide.md   # SOPs with [Employee] / [IT only] steps
+│   └── it_service_management_policy.md            # teams, SLA, major incident, access approval, escalation
+│
+└── scripts/
+    └── ingest_kb.py                 # ingestion pipeline: chunk data/kb → Pinecone (run by hand)
 ```
 
-How the layers depend on each other: **api → agent → tools → services → db**.
-The API and the tools both call the same services, so a ticket created by the agent and one updated by an engineer go through the same code.
+**How the layers depend on each other:** `api → agent → tools → services → db`, with `config` and `core` used by all of them.
+
+- The API routes and the agent tools call the **same services**. A ticket created by the agent and one updated by an engineer go through the same code.
+- Only `db/` talks to MongoDB and Pinecone directly.
 
 ## 3. Configuration (.env)
 
@@ -77,8 +130,8 @@ Secrets (API keys, the database URI, the JWT secret) are read as `SecretStr` and
 
 | Key | Used for |
 |---|---|
-| `APP_NAME`, `APP_VERSION` | API title and version |
-| `AIRLINE_NAME` | airline name in guardrail replies and /meta |
+| `APP_NAME`, `APP_VERSION` | API title and version; app name in the prompts |
+| `AIRLINE_NAME` | airline name in the prompts, guardrail replies and /meta |
 | `GROQ_API_KEY` | Groq API key (secret) |
 | `GROQ_MODEL` | the LLM used by every agent step |
 | `GROQ_TEMPERATURE`, `GROQ_TIMEOUT`, `GROQ_MAX_RETRIES`, `GROQ_REASONING_EFFORT` | LLM behaviour |
@@ -86,6 +139,7 @@ Secrets (API keys, the database URI, the JWT secret) are read as `SecretStr` and
 | `SLA_HOURS` | SLA hours per priority (JSON) |
 | `SIMILAR_TICKETS_LIMIT` | how many tickets find_similar_tickets returns |
 | `AGENT_RETRY_ATTEMPTS` | retries when the LLM writes a broken tool call |
+| `CHAT_TITLE_MAX_CHARS` | max length of a chat title in the history list |
 | `TICKET_ID_PREFIX`, `APPROVAL_ID_PREFIX` | prefixes of new ticket and approval IDs (`<prefix>-<number>`) |
 | `ACCESS_APPROVER_TEAM` | IT team whose engineers may approve any access request |
 | `PINECONE_API_KEY`, `PINECONE_INDEX` | Pinecone API key (secret), index name |
@@ -139,7 +193,7 @@ Runs use `durability="exit"`: state is saved only when the run ends, after `inpu
 
 Prompts are plain text files in `app/prompts/`. They are read once at startup and filled with `str.format`.
 
-**`classify_issue.txt`**: the triage rules.
+**`classify_issue.txt`**: the triage rules. Placeholders: `{app_name}`, `{airline_name}` (from `.env`, filled once at startup).
 - **Step 1:** is the employee asking to *be given* access, or for a password reset? Then it is an Access Request for Identity & Access Management.
 - **Step 2:** otherwise the category gives the team:
 
@@ -157,7 +211,7 @@ Prompts are plain text files in `app/prompts/`. They are read once at startup an
   - P4 = access, question, minor issue
 - **Airport:** an IATA airport code, or UNKNOWN.
 
-**`resolve_issue.txt`**: the agent's playbook. Placeholders: `{employee_id}`, `{category}`, `{priority}`, `{team}`, `{airport}`, `{knowledge}`.
+**`resolve_issue.txt`**: the agent's playbook. Placeholders: `{app_name}`, `{airline_name}` (from `.env`), `{employee_id}`, `{category}`, `{priority}`, `{team}`, `{airport}`, `{knowledge}`.
 
 1. **Hardware:** ask for the device ID and the error first.
 2. **Network / Check-in:** call `find_similar_tickets` first.

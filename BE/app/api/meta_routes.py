@@ -1,4 +1,4 @@
-"""The fixed business values (teams, statuses, ...) so the frontend never keeps its own copy."""
+"""Meta endpoint: the fixed business values (teams, statuses, ...) so the frontend never keeps its own copy."""
 
 from typing import get_args
 
@@ -11,6 +11,7 @@ from app.core.domain import Category, Level, Priority, Status, Team
 router = APIRouter(prefix="/meta", tags=["meta"], dependencies=[Depends(current_user)])
 
 
+# Airline name and the allowed values from domain.py
 @router.get("")
 async def meta():
     return {

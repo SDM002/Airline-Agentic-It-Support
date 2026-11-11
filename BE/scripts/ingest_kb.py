@@ -1,7 +1,4 @@
-"""Loads the knowledge base documents into Pinecone. Run from BE/: python -m scripts.ingest_kb
-
-Load -> chunk by headings -> (Pinecone embeds) -> store. Re-run whenever a document in data/kb changes.
-"""
+"""Ingestion pipeline: chunk the documents in RAG_KB_DIR and store them in Pinecone. Run from BE/: python -m scripts.ingest_kb"""
 
 from pathlib import Path
 
@@ -10,18 +7,19 @@ from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharac
 from app.config.settings import settings
 from app.db.vector_store import pc, vector_store
 
-# One chunk per SOP / policy section; the heading stays in the text so it is embedded too
+# Split by headings: one chunk per SOP / policy section, heading kept in the text
 header_splitter = MarkdownHeaderTextSplitter(
     headers_to_split_on=[("#", "document"), ("##", "section"), ("###", "sop")],
     strip_headers=False,
 )
 
-# Safety net for sections longer than RAG_CHUNK_SIZE
+# Split sections longer than RAG_CHUNK_SIZE, with overlap
 size_splitter = RecursiveCharacterTextSplitter(
     chunk_size=settings.RAG_CHUNK_SIZE,
     chunk_overlap=settings.RAG_CHUNK_OVERLAP,
 )
 
+# Load and chunk every document, tagging each chunk with its file name
 chunks = []
 for path in sorted(Path(settings.RAG_KB_DIR).glob("*.md")):
     sections = header_splitter.split_text(path.read_text())
@@ -29,10 +27,11 @@ for path in sorted(Path(settings.RAG_KB_DIR).glob("*.md")):
         section.metadata["source"] = path.name
     chunks += size_splitter.split_documents(sections)
 
-# Start from an empty index so chunks from an older version of the documents are removed
+# Empty the index so chunks from older document versions are removed
 if pc.Index(settings.PINECONE_INDEX).describe_index_stats().total_vector_count:
     vector_store.delete(delete_all=True)
 
+# Embed (by Pinecone) and store, with stable IDs
 ids = [f"{c.metadata['source']}-{i}" for i, c in enumerate(chunks)]
 vector_store.add_documents(chunks, ids=ids)
 

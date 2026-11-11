@@ -1,15 +1,12 @@
-"""Approval workflow for access requests (policy IT-POL-002, section 5).
-
-Who may decide: the requester's line manager, or an IAM engineer. Nobody approves their own request.
-"""
+"""Access request approvals: the requester's line manager or the ACCESS_APPROVER_TEAM decides, never the requester."""
 
 from app.config.settings import settings
 from app.db.mongo import approvals, next_id, now, out, tickets, users
 from app.services import employee_service, ticket_service
 
 
+# Create a pending approval and set the ticket to awaiting-approval (reuses an existing one on resume)
 async def request_approval(ticket_id: str, action: str, reason: str, thread_id: str) -> dict:
-    # Idempotent: LangGraph re-runs the tool on resume, so reuse the existing approval
     existing = await approvals.find_one({"ticket_id": ticket_id, "action": action})
     if existing:
         return out(existing)
@@ -30,6 +27,7 @@ async def request_approval(ticket_id: str, action: str, reason: str, thread_id: 
     return out(approval)
 
 
+# True if the approver is the requester's line manager or in ACCESS_APPROVER_TEAM, and not the requester
 def can_decide(approver: dict, requester: dict) -> bool:
     if approver["id"] == requester["id"]:
         return False
@@ -38,10 +36,10 @@ def can_decide(approver: dict, requester: dict) -> bool:
     return approver["role"] == "manager" and requester.get("manager_id") == approver["id"]
 
 
+# Approvals with their tickets, newest first; managers see only their team members' requests
 async def list_approvals(user: dict, status: str | None) -> list[dict]:
     query = {"status": status} if status else {}
     if user["role"] == "manager":
-        # Managers only see requests from their own team members
         reports = await users.distinct("_id", {"manager_id": user["id"]})
         query["ticket_id"] = {"$in": await tickets.distinct("_id", {"requester_id": {"$in": reports}})}
 
@@ -53,6 +51,7 @@ async def list_approvals(user: dict, status: str | None) -> list[dict]:
     return result
 
 
+# Approve (ticket resolved) or reject (ticket closed) after checking who may decide
 async def decide(approval_id: str, approve: bool, approver: dict, comment: str | None) -> dict:
     approval = await approvals.find_one({"_id": approval_id})
     if approval is None:

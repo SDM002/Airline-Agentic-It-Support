@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+    <style>
+      .lane { fill: #ffffff; stroke: #d0d7de; stroke-width: 1.5; }
+      .inner { fill: #f6f8fa; stroke: #d0d7de; stroke-width: 1.2; }
+      .head { font-size: 18px; font-weight: 600; fill: #1f2328; text-anchor: middle; }
+      .title { font-size: 15px; font-weight: 600; fill: #1f2328; text-anchor: middle; }
+      .sub { font-size: 13px; fill: #57606a; text-anchor: middle; }
+      .code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; fill: #0969da; text-anchor: middle; }
+      .label { font-size: 12px; fill: #57606a; text-anchor: middle; }
+      .flow { stroke: #57606a; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="960" height="600" rx="18" fill="#f6f8fa"/>
+
+  <!-- Frontend -->
+  <rect x="30" y="30" width="210" height="470" rx="14" fill="#eef2fb" stroke="#c9d6f2" stroke-width="1.5"/>
+  <text x="135" y="62" class="head">Frontend</text>
+  <text x="135" y="82" class="sub">Next.js · FE/</text>
+
+  <rect x="50" y="100" width="170" height="160" rx="10" class="lane"/>
+  <text x="135" y="124" class="title">Pages per role</text>
+  <text x="135" y="150" class="sub">Chat (live steps)</text>
+  <text x="135" y="172" class="sub">My tickets</text>
+  <text x="135" y="194" class="sub">Dashboard · Tickets</text>
+  <text x="135" y="216" class="sub">Ticket detail</text>
+  <text x="135" y="238" class="sub">Approvals</text>
+  <path d="M135,260 V292" class="flow"/>
+
+  <rect x="50" y="296" width="170" height="90" rx="10" class="lane"/>
+  <text x="135" y="322" class="code">lib/api.js</text>
+  <text x="135" y="346" class="sub">only link to the backend</text>
+  <text x="135" y="366" class="sub">keeps the JWT</text>
+
+  <text x="135" y="426" class="sub">Employee · Manager</text>
+  <text x="135" y="446" class="sub">IT engineer</text>
+  <text x="135" y="472" class="label">(browser)</text>
+
+  <!-- FE -> BE -->
+  <path d="M220,341 H326" class="flow"/>
+  <text x="274" y="312" class="label">HTTPS</text>
+  <text x="274" y="328" class="label">Bearer JWT</text>
+  <text x="274" y="362" class="label">REST · SSE</text>
+
+  <!-- Backend -->
+  <rect x="330" y="30" width="370" height="470" rx="14" class="lane"/>
+  <text x="515" y="62" class="head">Backend</text>
+  <text x="515" y="82" class="sub">FastAPI · BE/</text>
+
+  <rect x="365" y="100" width="300" height="60" rx="10" class="inner"/>
+  <text x="515" y="125" class="title">API routes</text>
+  <text x="515" y="146" class="sub">login · chat · tickets · approvals · meta</text>
+  <path d="M515,160 V184" class="flow"/>
+
+  <rect x="365" y="188" width="300" height="170" rx="10" fill="#fbf8ff" stroke="#d8c8f5" stroke-width="1.2"/>
+  <text x="515" y="213" class="title">LangGraph agent</text>
+  <text x="515" y="240" class="code">input_guard</text>
+  <text x="515" y="262" class="code">classify_issue</text>
+  <text x="515" y="284" class="code">search_knowledge (RAG)</text>
+  <text x="515" y="306" class="code">resolve_issue ⇄ tools</text>
+  <text x="515" y="328" class="code">output_guard</text>
+  <text x="515" y="348" class="label">pauses for human approval (interrupt)</text>
+  <path d="M515,358 V382" class="flow"/>
+
+  <rect x="365" y="386" width="300" height="80" rx="10" class="inner"/>
+  <text x="515" y="411" class="title">Services</text>
+  <text x="515" y="432" class="sub">tickets · approvals · employees</text>
+  <text x="515" y="452" class="sub">knowledge · auth · conversations</text>
+
+  <!-- routes -> services directly -->
+  <path d="M352,130 H360" stroke="#57606a" stroke-width="1.5" fill="none"/>
+  <path d="M352,130 V426 H361" class="flow"/>
+
+  <!-- External systems -->
+  <rect x="770" y="30" width="160" height="120" rx="14" fill="#fff8f0" stroke="#f0d0a8" stroke-width="1.5"/>
+  <text x="850" y="66" class="head">Groq</text>
+  <text x="850" y="92" class="sub">LLM</text>
+  <text x="850" y="114" class="sub">classify · decide</text>
+  <text x="850" y="132" class="sub">write replies</text>
+
+  <rect x="770" y="185" width="160" height="130" rx="14" fill="#f3eefc" stroke="#d8c8f5" stroke-width="1.5"/>
+  <text x="850" y="221" class="head">Pinecone</text>
+  <text x="850" y="247" class="sub">vector database</text>
+  <text x="850" y="269" class="sub">SOPs + IT policy</text>
+  <text x="850" y="291" class="sub">embed + rerank</text>
+
+  <rect x="770" y="350" width="160" height="150" rx="14" fill="#eaf5ee" stroke="#b7dfc3" stroke-width="1.5"/>
+  <text x="850" y="386" class="head">MongoDB</text>
+  <text x="850" y="410" class="sub">Atlas</text>
+  <text x="850" y="434" class="sub">users · tickets</text>
+  <text x="850" y="454" class="sub">approvals · audit</text>
+  <text x="850" y="474" class="sub">chats · agent memory</text>
+
+  <!-- BE -> external -->
+  <path d="M665,240 L766,100" class="flow"/>
+  <text x="744" y="190" class="label">prompts</text>
+
+  <path d="M665,284 L766,252" class="flow"/>
+  <text x="716" y="258" class="label">RAG</text>
+
+  <path d="M665,330 L766,395" class="flow"/>
+  <text x="704" y="378" class="label">memory</text>
+
+  <path d="M665,430 L766,440" class="flow"/>
+  <text x="716" y="426" class="label">data</text>
+
+  <!-- Legend -->
+  <text x="480" y="540" class="sub"><tspan font-weight="600" fill="#1f2328">Design rule:</tspan> documents (how to fix something) live in Pinecone · facts (who, what, which tickets) live in MongoDB</text>
+  <text x="480" y="566" class="sub">The agent always searches the documents (RAG) before it touches any data</text>
+</svg>

@@ -1,24 +1,24 @@
-"""The shared state every graph node reads from and writes to."""
+"""Agent state: the shared data of one chat that every graph node reads and updates."""
 
 from langgraph.graph import MessagesState
 
 
 class AgentState(MessagesState):
-    # messages: list  -> inherited; new messages are appended, not replaced
+    """Chat state saved per thread: messages (appended) plus the employee, classification, RAG results and guardrail flags (overwritten)."""
 
-    # Who is chatting (set by the API, read by the tools)
+    # Who is chatting (set by the API from the login token, read by the tools)
     employee_id: str
 
-    # Filled by the classify_issue node
+    # Issue classification (set by classify_issue)
     category: str
     priority: str
     team: str
     airport: str
     reason: str
 
-    # Filled by the search_knowledge node (RAG): best matching SOP / policy sections
+    # Best matching SOP / policy sections from Pinecone (set by search_knowledge)
     knowledge: list[dict]
 
-    # Filled by the guardrails on every message: was it blocked, and which rules fired
+    # Guardrail result for the latest message (set by input_guard and output_guard)
     blocked: bool
     guardrails: list[str]

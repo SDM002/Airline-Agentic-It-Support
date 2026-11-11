@@ -9,6 +9,7 @@ from app.tools.request_approval import request_approval
 from app.tools.search_knowledge_base import search_knowledge_base
 from app.tools.update_ticket import update_ticket
 
+# Tools bound to the LLM in resolve_issue
 TOOLS = [
     search_knowledge_base,
     get_employee_profile,

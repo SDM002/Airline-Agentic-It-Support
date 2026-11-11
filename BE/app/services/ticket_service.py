@@ -1,4 +1,4 @@
-"""Ticket business logic. The API routes (humans) and the agent tools (LLM) both call these functions."""
+"""Ticket logic shared by the API routes (engineers) and the agent tools (LLM)."""
 
 from pymongo import ReturnDocument
 
@@ -6,14 +6,17 @@ from app.config.settings import settings
 from app.db.mongo import audit_logs, comments, next_id, now, out, tickets
 
 
+# Record who did what to a ticket
 async def log(ticket_id: str, actor: str, event: str):
     await audit_logs.insert_one({"ticket_id": ticket_id, "actor": actor, "event": event, "at": now()})
 
 
+# Add a comment to a ticket
 async def add_comment(ticket_id: str, author: str, text: str):
     await comments.insert_one({"ticket_id": ticket_id, "author": author, "text": text, "created_at": now()})
 
 
+# New open ticket from a chat, with an ID from TICKET_ID_PREFIX and the SLA for its priority
 async def create_ticket(*, title, description, category, priority, team, airport, requester, actor, thread_id=None) -> dict:
     ticket = {
         "_id": await next_id("ticket", settings.TICKET_ID_PREFIX),
@@ -38,10 +41,12 @@ async def create_ticket(*, title, description, category, priority, team, airport
     return out(ticket)
 
 
+# One ticket
 async def get_ticket(ticket_id: str) -> dict | None:
     return out(await tickets.find_one({"_id": ticket_id}))
 
 
+# One ticket with its comments and audit trail
 async def get_ticket_detail(ticket_id: str) -> dict | None:
     ticket = await get_ticket(ticket_id)
     if ticket:
@@ -50,16 +55,19 @@ async def get_ticket_detail(ticket_id: str) -> dict | None:
     return ticket
 
 
+# Text of the newest comment, if any
 async def latest_comment(ticket_id: str) -> str | None:
     comment = await comments.find_one({"ticket_id": ticket_id}, sort=[("created_at", -1)])
     return comment["text"] if comment else None
 
 
+# Tickets matching the given filters (None values ignored), newest first
 async def list_tickets(filters: dict) -> list[dict]:
     query = {k: v for k, v in filters.items() if v is not None}
     return [out(t) async for t in tickets.find(query).sort("created_at", -1)]
 
 
+# Apply changes, log each one and add the optional comment
 async def update_ticket(ticket_id: str, actor: str, changes: dict, comment: str | None = None) -> dict | None:
     changes = {k: v for k, v in changes.items() if v is not None}
     if changes:
@@ -77,6 +85,7 @@ async def update_ticket(ticket_id: str, actor: str, changes: dict, comment: str 
     return out(ticket)
 
 
+# Best text-search matches, optionally at one airport, up to SIMILAR_TICKETS_LIMIT
 async def find_similar_tickets(description: str, airport: str | None = None) -> list[dict]:
     query = {"$text": {"$search": description}}
     if airport and airport != "UNKNOWN":
