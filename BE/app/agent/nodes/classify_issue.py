@@ -18,6 +18,7 @@ class IssueClassification(BaseModel):
     priority: Priority
     team: Team
     airport: str = Field(description="IATA airport code, or UNKNOWN")
+    reason: str = Field(description="One short sentence: why this category, team and priority")
 
 
 classifier_llm = llm.with_structured_output(IssueClassification)

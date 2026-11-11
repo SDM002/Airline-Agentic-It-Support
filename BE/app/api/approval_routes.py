@@ -1,29 +1,32 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from langgraph.types import Command
 from pydantic import BaseModel
 
 from app.agent.graph import graph
+from app.api.agent_routes import SAVE_AT_END
+from app.api.deps import require_roles
 from app.services import approval_service
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 
+approver_only = require_roles("manager", "it_support")
+
 
 class Decision(BaseModel):
     approve: bool
-    decided_by: str
     comment: str | None = None
 
 
 @router.get("")
-async def list_approvals(status: str | None = "pending"):
-    return await approval_service.list_approvals(status)
+async def list_approvals(status: str | None = "pending", user: dict = Depends(approver_only)):
+    return await approval_service.list_approvals(user, status)
 
 
 @router.post("/{approval_id}/decision")
-async def decide(approval_id: str, body: Decision):
+async def decide(approval_id: str, body: Decision, user: dict = Depends(approver_only)):
 
     try:
-        approval = await approval_service.decide(approval_id, body.approve, body.decided_by, body.comment)
+        approval = await approval_service.decide(approval_id, body.approve, user, body.comment)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -38,6 +41,6 @@ async def decide(approval_id: str, body: Decision):
     # Resume the paused agent conversation with the human decision
     config = {"configurable": {"thread_id": approval["thread_id"]}}
     decision = {"status": approval["status"], "decided_by": approval["decided_by"], "comment": body.comment}
-    state = await graph.ainvoke(Command(resume=decision), config)
+    state = await graph.ainvoke(Command(resume=decision), config, durability=SAVE_AT_END)
 
     return {"approval": approval, "agent_reply": state["messages"][-1].content}

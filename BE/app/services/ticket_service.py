@@ -16,7 +16,7 @@ async def add_comment(ticket_id: str, author: str, text: str):
 
 async def create_ticket(*, title, description, category, priority, team, airport, requester, actor, thread_id=None) -> dict:
     ticket = {
-        "_id": await next_id("ticket", "SKY"),
+        "_id": await next_id("ticket", settings.TICKET_ID_PREFIX),
         "title": title,
         "description": description,
         "category": category,

@@ -1,9 +1,11 @@
-"""Approval workflow for sensitive actions (access requests). Only managers or IT support may decide."""
+"""Approval workflow for access requests (policy IT-POL-002, section 5).
 
-from app.db.mongo import approvals, next_id, now, out
+Who may decide: the requester's line manager, or an IAM engineer. Nobody approves their own request.
+"""
+
+from app.config.settings import settings
+from app.db.mongo import approvals, next_id, now, out, tickets, users
 from app.services import employee_service, ticket_service
-
-APPROVER_ROLES = {"manager", "it_support"}
 
 
 async def request_approval(ticket_id: str, action: str, reason: str, thread_id: str) -> dict:
@@ -13,7 +15,7 @@ async def request_approval(ticket_id: str, action: str, reason: str, thread_id: 
         return out(existing)
 
     approval = {
-        "_id": await next_id("approval", "APR"),
+        "_id": await next_id("approval", settings.APPROVAL_ID_PREFIX),
         "ticket_id": ticket_id,
         "action": action,
         "reason": reason,
@@ -28,25 +30,40 @@ async def request_approval(ticket_id: str, action: str, reason: str, thread_id: 
     return out(approval)
 
 
-async def list_approvals(status: str | None) -> list[dict]:
+def can_decide(approver: dict, requester: dict) -> bool:
+    if approver["id"] == requester["id"]:
+        return False
+    if approver["role"] == "it_support" and approver.get("team") == settings.ACCESS_APPROVER_TEAM:
+        return True
+    return approver["role"] == "manager" and requester.get("manager_id") == approver["id"]
+
+
+async def list_approvals(user: dict, status: str | None) -> list[dict]:
     query = {"status": status} if status else {}
-    return [out(a) async for a in approvals.find(query).sort("created_at", -1)]
+    if user["role"] == "manager":
+        # Managers only see requests from their own team members
+        reports = await users.distinct("_id", {"manager_id": user["id"]})
+        query["ticket_id"] = {"$in": await tickets.distinct("_id", {"requester_id": {"$in": reports}})}
+
+    result = []
+    async for approval in approvals.find(query).sort("created_at", -1):
+        approval = out(approval)
+        approval["ticket"] = await ticket_service.get_ticket(approval["ticket_id"])
+        result.append(approval)
+    return result
 
 
-async def get_approval(approval_id: str) -> dict | None:
-    return out(await approvals.find_one({"_id": approval_id}))
-
-
-async def decide(approval_id: str, approve: bool, decided_by: str, comment: str | None) -> dict:
+async def decide(approval_id: str, approve: bool, approver: dict, comment: str | None) -> dict:
     approval = await approvals.find_one({"_id": approval_id})
     if approval is None:
         raise LookupError("Approval not found")
     if approval["status"] != "pending":
         raise ValueError(f"Approval already {approval['status']}")
 
-    approver = await employee_service.get_employee(decided_by)
-    if approver is None or approver["role"] not in APPROVER_ROLES:
-        raise PermissionError("Only a manager or IT support can approve")
+    ticket = await ticket_service.get_ticket(approval["ticket_id"])
+    requester = await employee_service.get_employee(ticket["requester_id"])
+    if not can_decide(approver, requester):
+        raise PermissionError("Only the requester's line manager or IAM can decide this request")
 
     status = "approved" if approve else "rejected"
     await approvals.update_one(
@@ -54,12 +71,11 @@ async def decide(approval_id: str, approve: bool, decided_by: str, comment: str 
         {"$set": {"status": status, "decided_by": approver["name"], "comment": comment, "decided_at": now()}},
     )
 
-    ticket_id = approval["ticket_id"]
     if approve:
         note = f"Approved by {approver['name']}. Access provisioned by IAM (simulated)."
-        await ticket_service.update_ticket(ticket_id, approver["name"], {"status": "resolved", "assignee": "L2"}, note)
+        await ticket_service.update_ticket(ticket["id"], approver["name"], {"status": "resolved", "assignee": "L2"}, note)
     else:
         note = f"Rejected by {approver['name']}." + (f" Reason: {comment}" if comment else "")
-        await ticket_service.update_ticket(ticket_id, approver["name"], {"status": "closed"}, note)
+        await ticket_service.update_ticket(ticket["id"], approver["name"], {"status": "closed"}, note)
 
     return out(await approvals.find_one({"_id": approval_id}))

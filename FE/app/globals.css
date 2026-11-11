@@ -1,0 +1,87 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: var(--font-geist);
+  --font-heading: var(--font-outfit);
+  --font-mono: var(--font-jetbrains);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-heading: var(--heading);
+  --color-terminal: var(--terminal);
+  --color-secondary: var(--muted);
+  --color-secondary-foreground: var(--heading);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--muted);
+  --color-accent-foreground: var(--heading);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--primary);
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.375rem;
+}
+
+/* Single light theme: sky-blue page, white cards, dark text. */
+:root {
+  color-scheme: light;
+  --background: #bae6fd; /* sky blue */
+  --foreground: #1e293b;
+  --heading: #0f172a;
+  --card: #ffffff;
+  --muted: #e0f2fe;
+  --muted-foreground: #475569;
+  --border: #93c5e4;
+  --primary: #0369a1; /* deep sky blue: buttons, links, active tabs */
+  --primary-foreground: #ffffff;
+  --success: #047857;
+  --destructive: #dc2626;
+  --terminal: #0b1220; /* agent-trace and tool-call blocks stay dark */
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+  h1, h2, h3 {
+    @apply font-heading font-bold tracking-tighter text-heading;
+  }
+}
+
+/* Scanlines + faint noise, used only on the agent-trace terminal block. */
+.scanlines {
+  position: relative;
+  isolation: isolate;
+}
+.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: repeating-linear-gradient(to bottom, rgb(255 255 255 / 0.025) 0 1px, transparent 1px 3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

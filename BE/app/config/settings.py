@@ -46,5 +46,17 @@ class Settings(BaseSettings):
     RAG_TOP_K: int
     RAG_TOP_N: int
 
+    # Organisation
+    AIRLINE_NAME: str
+    TICKET_ID_PREFIX: str
+    APPROVAL_ID_PREFIX: str
+    ACCESS_APPROVER_TEAM: str
+
+    # Auth (JWT)
+    JWT_SECRET: SecretStr
+    JWT_ALGORITHM: str
+    JWT_EXPIRE_MINUTES: int
+    CORS_ORIGINS: list[str]
+
 
 settings = Settings()
