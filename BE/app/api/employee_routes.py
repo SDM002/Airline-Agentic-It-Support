@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.api.deps import require_roles
 from app.services import employee_service
 
-router = APIRouter(prefix="/employees", tags=["employees"])
+router = APIRouter(prefix="/employees", tags=["employees"], dependencies=[Depends(require_roles("manager", "it_support"))])
 
 
 @router.get("")

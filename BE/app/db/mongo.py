@@ -18,6 +18,7 @@ comments = db["comments"]
 approvals = db["approvals"]
 audit_logs = db["audit_logs"]
 counters = db["counters"]
+conversations = db["conversations"]
 
 
 def now() -> datetime:

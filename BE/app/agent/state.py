@@ -14,3 +14,11 @@ class AgentState(MessagesState):
     priority: str
     team: str
     airport: str
+    reason: str
+
+    # Filled by the search_knowledge node (RAG): best matching SOP / policy sections
+    knowledge: list[dict]
+
+    # Filled by the guardrails on every message: was it blocked, and which rules fired
+    blocked: bool
+    guardrails: list[str]

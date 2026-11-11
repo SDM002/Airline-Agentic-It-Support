@@ -17,3 +17,8 @@ langgraph-checkpoint-mongodb
 # Phase 4: RAG (Pinecone vector DB with hosted embedding + rerank models)
 langchain-pinecone
 langchain-text-splitters
+
+# Phase 5: login (JWT tokens, hashed passwords, login form)
+pyjwt
+pwdlib[argon2]
+python-multipart
