@@ -132,7 +132,18 @@ Full list with roles and responses: [BE/README.md §11](BE/README.md#11-endpoint
 | `manager` | Line managers | Approve or reject their own team's access requests |
 | `it_support` | IT engineers | Dashboard, all tickets, update and assign; the `ACCESS_APPROVER_TEAM` may approve any request |
 
-## 8. Run it
+## 8. Demo data
+
+All demo data is synthetic and was created for this POC. It is loaded into the two databases the app uses:
+
+| Where | What | How it got there |
+|---|---|---|
+| **Pinecone** | Airline knowledge base: SOPs with `[Employee]` / `[IT only]` steps, and the IT service management policy | Documents in `BE/data/kb/`, chunked and embedded by `python -m scripts.ingest_kb` |
+| **MongoDB Atlas** | Employees, managers and IT engineers (with roles and line managers), tickets, comments, approvals and audit history | Loaded once for the demo presentation |
+
+The tickets include deliberate patterns for the demo, such as a cluster of open network reports at one airport (incident detection) and repeated check-in timeouts at another (escalation).
+
+## 9. Run it
 
 You need Python 3.11, Node 20+, and free accounts on Groq, MongoDB Atlas and Pinecone.
 
@@ -154,7 +165,7 @@ npm run dev
 
 Open the address printed by `npm run dev` (it must be in `CORS_ORIGINS`) and sign in with a demo employee ID and password.
 
-## 9. Repository
+## 10. Repository
 
 | Folder | What | Details |
 |---|---|---|
