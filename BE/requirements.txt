@@ -1,0 +1,19 @@
+# Phase 0: web server
+fastapi
+uvicorn[standard]
+
+# Phase 1: config + LLM (Groq API)
+pydantic-settings
+langchain-groq
+
+# Phase 2: agent workflow
+langchain
+langgraph
+
+# Phase 3: database (MongoDB Atlas) + chat memory in MongoDB
+pymongo
+langgraph-checkpoint-mongodb
+
+# Phase 4: RAG (Pinecone vector DB with hosted embedding + rerank models)
+langchain-pinecone
+langchain-text-splitters
